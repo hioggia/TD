@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html  style="padding:0 0 0 0;margin:0 0 0 0;width:100%;height:100%;">
+<head>
+    <meta charset="utf-8"/>
+<style>
+
+h1 {
+    font-family:"STCaiyun";
+    font-size:50px;
+    text-shadow: 0 0 8px #fff;
+    position:relative;
+    z-index:10;
+}
+h1 span {
+    font-family:"STHupo";
+    font-size:80px;
+}
+#menu ul {
+    padding: 0 0 0 0;
+    position:absolute;
+    right:80px;
+    margin-top:50px;
+    background-color:rgba(8,8,8,.5);
+}
+#menu li {
+    font-family:"STCaiyun";
+    font-size:50px;
+    display:block;
+    cursor:pointer;
+    margin:30px 30px 30px 30px;
+}
+#menu li:hover {
+    font-family:"STHupo";
+    color:blue;
+}
+#menu  {
+    -webkit-box-sizing:border-box;
+}
+#progresscontainer {
+    height:30px;
+    width:630px;
+    background:-webkit-gradient(linear, 0 0, 0 100%, from(green), to(gray)); 
+    border-radius:15px;
+    margin:auto auto auto auto;
+    -webkit-box-orient:horizontal;
+    top:300px;
+    position:relative;
+}
+#progress {
+    height:30px;
+    width:0px;
+    background:-webkit-gradient(linear, 0 0, 0 100%, from(red), to(gray));
+    border-radius:15px;
+    -webkit-box-shadow: 1px 1px 0px rgba(200,200,200,.7);
+}
+
+.ui_tower_select{position:fixed;z-index:20000;bottom:0;left:50%;margin-left:-210px;width:420px;height:80px;background-color:#333;}
+.ui_tower_select ul{margin:0 auto;padding:0;width:320px;overflow:hidden;}
+.ui_tower_select li{float:left;width:60px;height:60px;margin:10px;background-color:#fff;list-style:none none;}
+.ui_tower_select li img{display:block; width:60px;height:60px;}
+.ui_tower_select:after{content:"";position:absolute;left:-40px;top:17px;z-index:20000;-webkit-transform:rotate(45deg);width:80px;height:80px;background-color:#333;}
+.ui_tower_select:before{content:"";position:absolute;right:-40px;top:17px;z-index:20000;-webkit-transform:rotate(45deg);width:80px;height:80px;background-color:#333;}
+
+.ui_ball{position:absolute;bottom:-5px;z-index:20002;width:120px;height:120px;border-radius:60px;overflow:hidden;}
+.ui_ball b{position:absolute;bottom:0;width:120px;height:120px;border-radius:60px;}
+.ui_ball.ui_blood{left:-70px}
+.ui_ball.ui_blood b{background-image:-webkit-radial-gradient(#ed9191,brown 50%);background-position:0 -25px;background-size:150px;}
+.ui_ball.ui_power{right:-70px}
+.ui_ball.ui_power b{background-image:-webkit-radial-gradient(lightgreen,green 50%);background-position:0 -25px;background-size:150px;}
+@-webkit-keyframes rotation{
+    0% {
+        -webkit-transform:rotate(0deg);
+    }
+    100% {
+        -webkit-transform:rotate(360deg);
+    }
+}
+
+#demo 
+{
+    font-size:2em;
+}
+#return
+{
+    font-size:2em;
+    font-family:'STCaiyun';
+    line-height:4em;
+    cursor:pointer;
+}
+#return:hover
+{
+    color:Blue;
+    font-family:'STHupo';
+}
+
+.h_scene{position:absolute;z-index:20005;width:100%;height:100%;background:url(hscene.png) no-repeat 20% 50% rgba(0,0,0,.5);background-size:512px 763.2px;}
+.h_scene p{position:absolute;font-size:40px;left:45%;top:20%;color:#fff;}
+</style>
+<script src="world.js"></script>
+<script src="plant.js"></script>
+<script src="plantFactory.js"></script>
+<script src="view.js"></script>
+<script src="TimeLine.js"></script>
+
+<script>
+
+window.UIParts = {};
+window.TowerTypes = {
+    '0': {hp: 10000, atk: 5, spd: 4, len: 10, cost: 0, img: '0.png', ball: 'ball.png'},  //主城
+    '1': {hp: 200, atk: 0, spd: 0, len: 0, cost: 20, img: '1.png'},   //牆
+    '2': {hp: 50, atk: 2, spd: 3, len: 8, cost: 50, img: '2.png', ball: 'ball.png'},  //箭塔，高速低攻
+    '3': {hp: 50, atk: 10, spd: 6, len: 12, cost: 150, rng: true, img: '3.png', ball: 'ball2.png'}   //炮臺，低速高攻
+};
+window.MasterStatus = {
+    hp: window.TowerTypes[0].hp, pow: 500,
+    maxHp: window.TowerTypes[0].hp, maxPow: 500,
+    buffing: false
+};
+
+
+
+
+function World(){
+    var me = this;
+    this.centerPos = {x:21,y:11};
+    this.mapMetaData = {
+        top : -1,
+        left : -1,
+        bottom : 22,
+        right : 45,
+    };
+    this.map = {};
+    this.positions = {};
+    this.view = new WorldView(document.querySelector("#game"),this.mapMetaData,this.map);
+    var bullets = {};
+    this.addBullet = function(bullet,info,t){
+        if(info.from)
+            var start = this.positions[info.from.id];
+        bullets[bullet.id] = bullet;
+        
+        bullet.effect.setDisplacement(this.positions[info.to.id][0]-this.positions[info.from.id][0],this.positions[info.to.id][1]-this.positions[info.from.id][1],t*100);
+        this.view.addEffect(bullet.effect,start[0],start[1]);
+    }
+    this.addItem = function(item,x,y){
+        item.world = this;
+        this.map[x+","+y] = item;
+        this.positions[item.id] = [x,y];
+        this.view.addItem(item.view,x,y);
+    }
+    this.removeItem = function(item){
+        item.world = null;
+        this.view.removeItem(item.view);
+        delete this.map[this.positions[item.id]];
+        delete this.positions[item.id];
+    }
+    this.moveItem = function(item,dx,dy,dt){
+        var pos = this.positions[item.id] ; 
+
+        
+        var x = pos[0], y = pos[1];
+        
+        if(this.map[[x+dx,y+dy]])
+            return false;
+        else 
+            this.map[[x+dx,y+dy]] = {};
+        
+        var move = function(){
+            delete me.map[pos];
+            if(!(item.world == me)) {
+                delete me.map[[x+dx,y+dy]];
+                delete me.map[me.positions[item.id]];
+                delete me.positions[item.id];
+                return ;
+            }
+            me.map[[x+dx,y+dy]] = item;
+            me.positions[item.id] = [x+dx,y+dy];
+        }
+        
+        if(!missions[time+dt/2])
+            missions[(time+dt/2).toFixed(0)] = [move];
+        else
+            missions[(time+dt/2).toFixed(0)].push(move);
+        item.view.setPosition((x+1)*size,(y+1)*size);
+        this.view.moveItem(item.view,dx*size,dy*size,dt*metatime);
+        return true;
+    }
+    this.getItemsInRange = function(item,range){
+        var r = [];
+        var origin = this.positions[item.id];
+        function distance(p){
+            return Math.sqrt(Math.pow(p[0]-origin[0],2)+Math.pow(p[1]-origin[1],2));
+        }
+        var queue = [origin];
+        var visited = {};
+        visited[origin] = true;
+        //debugger;
+        while(queue.length) {
+            var current = queue.shift();
+            visited[current] = true;
+            if(distance(current)>range) 
+                continue;
+            
+            if(this.map[current]) r.push(current);
+            
+            if(!visited[[current[0]+1,current[1]]]) {
+                visited[[current[0]+1,current[1]]] = true;
+                queue.push([current[0]+1,current[1]]);
+            }
+            if(!visited[[current[0],current[1]+1]]) {
+                visited[[current[0],current[1]+1]] = true;
+                queue.push([current[0],current[1]+1]);
+            }
+            if(!visited[[current[0]-1,current[1]]]) {
+                visited[[current[0]-1,current[1]]] = true;
+                queue.push([current[0]-1,current[1]]);
+            }
+            if(!visited[[current[0],current[1]-1]]) {
+                visited[[current[0],current[1]-1]] = true;
+                queue.push([current[0],current[1]-1]);
+            }
+            //console.log(visited);
+        }
+        r = r.filter(function(e){
+            return e.toString()!=origin.toString() && me.map[e].world;
+        }).map(function(e){
+            return me.map[e];
+        });
+        
+        return r;
+    }
+    var missions = {};
+
+    var metatime =100;
+    var worldtimer = null;
+    var begin = Date.now();
+    var time = 0;
+    void function(){
+        time++;
+        //console.log(Date.now()-begin);
+        if(missions[time])
+            missions[time].forEach(function(f){ f(); })
+        for(var p in me.map)
+            me.map[p].time && me.map[p].time(time);
+            
+        for(var p in bullets) {
+            bullets[p].time(time);
+            if(bullets[p].deleted)
+                delete bullets[p];
+        }
+            
+        worldtimer = setTimeout(arguments.callee,begin+time*200-Date.now());
+    }();
+}
+var controller = {
+    mapClicked:function(x,y){
+        if(world.map[x+","+y]) {
+            //world.map[x+","+y].view&&
+            //world.map[x+","+y].view.stopMoving&&
+            //    world.map[x+","+y].view.stopMoving();
+            return;
+        }else{
+            select(x,y);
+        }
+        /*var yuna = new Yuna(x,y);
+        yuna.view.startMoving();
+        world.addItem(yuna,x,y);*/
+    }
+}
+
+var objectIndex = {};
+
+function WorldObject(){
+    this.id = objectId ++;
+    objectIndex[this.id] = this;
+}
+
+function WorldView(container,mapMetaData,map) {
+    for(var y = mapMetaData.top;y<mapMetaData.bottom; y++) {
+        for(var x = mapMetaData.left;x<mapMetaData.right; x++) {
+            var div = document.createElement("div");
+            div.style.background = "url(./ground.png)";
+            div.style.height = size+"px";
+            div.style.width = size+"px";
+            div.style.position = "absolute";
+            div.style.top = size*(y-mapMetaData.top) + "px";
+            div.style.left = size*(x-mapMetaData.left) + "px";
+
+            var item = map[x+","+y];
+            if(item) {
+                item.view.setPosition(size*(x-mapMetaData.left),size*(y-mapMetaData.top));
+                container.appendChild(item.view.element);
+            }
+
+            void function(x,y){
+                div.onclick = function () {
+                    controller && controller.mapClicked(x,y)
+                }
+            }(x,y);
+            container.appendChild(div);
+        }
+    }
+    this.addEffect = function(effect,x,y){
+        container.appendChild(effect.element);
+        effect.setPosition((x)*size+size/2,(y)*size+size/2);
+        effect.start();
+    }
+    this.addItem = function(view,x,y){
+        view.setPosition(size*(x-mapMetaData.left),size*(y-mapMetaData.top));
+        container.appendChild(view.element);
+    }
+    this.removeItem = function(view) {
+        container.removeChild(view.element);
+    }
+    this.moveItem = function(view,dx,dy,dt){
+        var begin = Date.now();
+        var orgin = view.getPosition();
+        view.setDirection(dx,dy);
+        //console.log([dx,dy]);
+        timer.addTimerProc(function(){
+            var t = Date.now() - begin;
+            if(t>dt) {
+                view.setPosition(orgin.x+dx,orgin.y+dy);
+                timer.removeTimerProc(arguments.callee);
+            }
+            else {
+                view.setPosition(orgin.x+dx*t/dt,orgin.y+dy*t/dt);
+            }
+        })
+    }
+    
+    
+}
+
+
+function TowerView(towerType){
+    var div = document.createElement("div");
+    div.style.background = "url("+ TowerTypes[towerType].img +") no-repeat";
+    div.style.backgroundSize = '100% 100%';
+    //div.style.outline = "solid 1px blue";
+    div.style.height = "32px";
+    div.style.width = "27px";
+    div.style.position = "absolute";
+
+    var hp = document.createElement("div");
+    hp.style.height = "3px";
+    hp.style.width = "32px";
+    hp.style.position = "absolute";
+    hp.style.background = "green";
+    div.appendChild(hp);
+
+
+    this.hurt = function(v) {
+        hp.style.width = v/TowerTypes[towerType].hp*32 +"px"
+    }
+
+    div.style.zIndex = "3";
+    div.style.pointerEvents = "none";
+    this.setPosition = function(x,y) {
+        div.style.top = y+size - 32 + "px";
+        div.style.left = x+size/2 - 12  + "px";
+        div.style.zIndex = 10000+y;
+    }
+    this.element = div;
+}
+function Tower(towerType){
+    WorldObject.call(this);
+    if(towerType == null){ towerType = 0 };//默認建主城
+    this.view = new TowerView(towerType);
+    this.hp = TowerTypes[towerType].hp;
+    this.type = towerType;
+    var cooldown = 0;
+    this.time = function(){
+        if(cooldown) return cooldown--; 
+        var yunas = this.world.getItemsInRange(this,TowerTypes[towerType].len).filter(function(e){ return !(e instanceof Tower) });
+        var target = yunas[Math.floor(Math.random()*yunas.length)];
+        if(yunas.length){
+            var len = Math.round(Math.sqrt(Math.pow( Math.abs(world.positions[this.id][0] - world.positions[target.id][0]), 2 ) + Math.pow( Math.abs(world.positions[this.id][1] - world.positions[target.id][1]), 2 )));
+            var atk = window.MasterStatus.buffing ? TowerTypes[towerType].atk*2 : TowerTypes[towerType].atk;
+            this.world.addBullet(new FireBall(world.positions[target.id],TowerTypes[towerType].ball,atk,TowerTypes[towerType].rng),{from:this,to:target},len);
+            window.MasterStatus.pow += 10;
+            if(window.MasterStatus.pow>window.MasterStatus.maxPow){
+                window.MasterStatus.pow = window.MasterStatus.maxPow;
+            }
+            window.UIParts['powerBall'].set();
+        }
+        cooldown = TowerTypes[towerType].spd;
+    };
+    this.hurt = function(damage){
+        this.hp -= damage;
+        this.view.hurt(this.hp);
+        if(this.type == 0){
+            //主城
+            window.MasterStatus.hp = this.hp;
+            window.UIParts['bloodBall'].set();
+        }
+        if(this.hp<=0){
+            this.world.removeItem(this);
+            if(this.type == 0){
+                //主城被吃了
+                gameOver();
+            }
+        }
+    }
+}
+function FireBallEffect(img){
+    var div = document.createElement("div");
+    div.style.cssText = "width:27px;height:27px;background:url("+ img +");background-size:100% 100%;-webkit-animation: rotation 1s infinite";
+    //div.style.outline = "solid 1px blue";
+    div.style.position = "absolute";
+
+    div.style.zIndex = "3";
+    div.style.pointerEvents = "none";
+    var ox,oy;
+    var dx,dy,dt;
+    this.setPosition = function(x,y){
+        ox = x +size/2;
+        oy = y +size/2;
+    }
+    this.setDisplacement = function(x,y,t){
+        dx = x*size;
+        dy = y*size;
+        dt = t;
+    }
+    
+    this.start = function(){
+        div.style.top = oy - 14 + "px";
+        div.style.left = ox - 14  + "px";
+        div.style.zIndex = 10000+oy;
+        var begin = Date.now();
+        timer.addTimerProc(function(){
+            var t = Date.now() - begin;
+            if(t>dt) {                
+                div.style.top = oy+dy +"px";
+                div.style.left = ox+dx +"px";
+                div.parentNode.removeChild(div);
+                timer.removeTimerProc(arguments.callee);
+            }
+            else {
+                div.style.top = oy+dy*t/dt+"px";
+                div.style.left = ox+dx*t/dt+"px";
+            }
+        })
+    }
+    this.element = div;
+}
+
+function FireBall(pos,img,atk,rng){
+    WorldObject.call(this);
+    this.effect = new FireBallEffect(img);
+    
+    var t = 1;
+    
+    this.time = function(){
+        if(t) return t--;
+        if(world.map[pos] && world.map[pos].hurt)
+            world.map[pos].hurt(atk);
+        if(rng){
+            if(world.map[[pos[0]-1,pos[1]]] && world.map[[pos[0]-1,pos[1]]].hurt)
+                world.map[[pos[0]-1,pos[1]]].hurt(atk/2);
+            if(world.map[[pos[0],pos[1]]] && world.map[[pos[0],pos[1]]].hurt)
+                world.map[[pos[0],pos[1]]].hurt(atk/2);
+            if(world.map[[pos[0]+1,pos[1]]] && world.map[[pos[0]+1,pos[1]]].hurt)
+                world.map[[pos[0]+1,pos[1]]].hurt(atk/2);
+                
+            if(world.map[[pos[0]-1,pos[1]+1]] && world.map[[pos[0]-1,pos[1]+1]].hurt)
+                world.map[[pos[0]-1,pos[1]+1]].hurt(atk/2);
+            if(world.map[[pos[0],pos[1]+1]] && world.map[[pos[0],pos[1]+1]].hurt)
+                world.map[[pos[0],pos[1]+1]].hurt(atk/2);
+            if(world.map[[pos[0]+1,pos[1]+1]] && world.map[[pos[0]+1,pos[1]+1]].hurt)
+                world.map[[pos[0]+1,pos[1]+1]].hurt(atk/2);
+                
+            if(world.map[[pos[0]-1,pos[1]-1]] && world.map[[pos[0]-1,pos[1]-1]].hurt)
+                world.map[[pos[0]-1,pos[1]-1]].hurt(atk/2);
+            if(world.map[[pos[0],pos[1]-1]] && world.map[[pos[0],pos[1]-1]].hurt)
+                world.map[[pos[0],pos[1]-1]].hurt(atk/2);
+            if(world.map[[pos[0]+1,pos[1]-1]] && world.map[[pos[0]+1,pos[1]-1]].hurt)
+                world.map[[pos[0]+1,pos[1]-1]].hurt(atk/2);
+        }
+        this.deleted = true;
+    }
+}
+
+
+
+
+
+
+
+
+var selection = {};
+function updateSelectionRect(x,y) {
+    if(!selection[x+","+y]) return;
+    if(selection[(x+1)+","+y])selection[x+","+y].style.borderRight="none";
+    else selection[x+","+y].style.borderRight="solid 1px blue";
+    if(selection[(x-1)+","+y])selection[x+","+y].style.borderLeft="none";
+    else selection[x+","+y].style.borderLeft="solid 1px blue";
+    if(selection[x+","+(y+1)])selection[x+","+y].style.borderBottom="none";
+    else selection[x+","+y].style.borderBottom="solid 1px blue";
+    if(selection[x+","+(y-1)])selection[x+","+y].style.borderTop="none";
+    else selection[x+","+y].style.borderTop="solid 1px blue";
+}
+
+function select(x,y){
+    if(!selection[x+","+y]) {
+        var div = document.createElement("div");
+        div.style.webkitBoxSizing = "border-box";
+        div.style.border = "solid 1px blue";
+        div.style.height = "30px";
+        div.style.width = "30px";
+        div.style.position = "absolute";
+        div.style.top = 30*(y+1) + "px";
+        div.style.left = 30*(x+1) + "px";    
+        div.style.zIndex = 10;
+        div.style.pointerEvents = "none";
+        document.body.appendChild(div);
+        selection[x+","+y] = div;
+
+    } else {
+        document.body.removeChild(selection[x+","+y]);
+        delete selection[x+","+y];
+    }
+    updateSelectionRect(x,y);
+    updateSelectionRect(x-1,y);
+    updateSelectionRect(x+1,y);
+    updateSelectionRect(x,y-1);
+    updateSelectionRect(x,y+1);
+}
+
+function bottomPanel(){
+    //顯示建造列表
+    if(window.UIParts['towerSelect']){
+        return;
+    }
+    var uiTowerSelect = document.createElement('div');
+    uiTowerSelect.className = 'ui_tower_select';
+    document.body.appendChild(uiTowerSelect);
+    uiTowerSelect.innerHTML = '<ul><li><img data-tt="1" src="1.png" /></li><li><img data-tt="2" src="2.png" /></li><li><img data-tt="3" src="3.png" /></li><li><img data-tt="4" src="4.jpg" /></li></ul>';
+    window.UIParts['towerSelect'] = uiTowerSelect;
+    uiTowerSelect.addEventListener( 'click', mouseBuildTower, false );
+
+    //血球
+    var uiBloodBall = document.createElement('div');
+    uiBloodBall.className = 'ui_ball ui_blood';
+    uiTowerSelect.appendChild(uiBloodBall);
+    uiBloodBall.innerHTML = '<b></b>';
+    window.UIParts['bloodBall'] = uiBloodBall;
+    uiBloodBall.set = function(){
+        var percent = window.MasterStatus.hp / window.MasterStatus.maxHp;
+        this.style.height = percent * 120 + 'px';
+    };
+
+    //怒氣
+    var uiPowerBall = document.createElement('div');
+    uiPowerBall.className = 'ui_ball ui_power';
+    uiTowerSelect.appendChild(uiPowerBall);
+    uiPowerBall.innerHTML = '<b></b>';
+    window.UIParts['powerBall'] = uiPowerBall;
+    uiPowerBall.set = function(){
+        var percent = window.MasterStatus.pow / window.MasterStatus.maxPow;
+        this.style.height = percent * 120 + 'px';
+    };
+}
+
+function mouseBuildTower(ev){
+    ev.preventDefault();
+    if(ev.target.tagName.toLowerCase() != 'img'){
+        return;
+    }
+    var towerType = ev.target.dataset['tt'];
+    buildTower(towerType);
+}
+
+function keyboardBuildTower(ev){
+    switch(ev.keyCode){
+        case 49:
+        case 50:
+        case 51:
+            buildTower(ev.keyCode-48);
+            break;
+    }
+}
+
+window.addEventListener( 'keydown', keyboardBuildTower, false );
+
+function buildTower(towerType){
+    if(towerType == 4){
+        return;//現在木有4
+    }
+    for(var s in selection){
+        var coord = s.split(',');
+        if(window.MasterStatus.pow >= window.TowerTypes[towerType].cost){
+            //足夠
+            window.MasterStatus.pow -= window.TowerTypes[towerType].cost;
+            window.UIParts['powerBall'].set();
+            world.addItem(new Tower(towerType),~~coord[0],~~coord[1]);
+        }        
+        select(coord[0],coord[1]);
+    }
+}
+
+var size = 30;
+var world;
+var timer = new TimeLine();
+
+function createWorld(){
+    world = new World();
+    world.addItem(new Tower(0),20,10);
+    PlantFactory.createPlantsByWave(0);
+    bottomPanel();
+}
+function createChallengeWorld(){
+    world = new World();
+    world.addItem(new Tower(0),20,10);
+    PlantFactory.startChallenge();
+    PlantFactory.createPlantsByWave(0);
+    bottomPanel();
+}
+
+function gameOver(){
+    for(var item in world.map){
+        delete world.map[item];
+    }
+    for(var item in world.positions){
+        delete world.positions[item];
+    }
+    for(var s in selection){
+        var coord = s.split(',');
+        select(coord[0],coord[1]);
+    }
+    document.querySelector('#game').style.display = 'none';
+    document.querySelector('#death').style.display = 'block';
+    window.UIParts['towerSelect'].style.display = 'none';
+}
+var hseed = false;
+function showH(callback){
+    if(hseed) return;
+    hseed = true;
+    var h = document.createElement('div');
+    h.className = 'h_scene';
+    h.innerHTML = '<p>哼~ 僵屍什麼的最討厭了！<br />你們這些沒有節操的僵屍！</p>';
+    document.body.appendChild(h);
+    setTimeout(function(){
+        h.addEventListener( 'click', function(){
+            h.removeEventListener( 'click', arguments.callee, false);
+            document.body.removeChild(h);
+            callback();
+            hseed = false;
+        }, false );
+    },3000);
+}
+/*
+function MapView(map) {
+    for(var y = map.top;y<map.bottom; y++) {
+        for(var x = map.left;x<map.right; x++) {
+            var div = document.createElement("div");
+            div.style.background = "url(./ground.png)";
+            div.style.height = "30px";
+            div.style.width = "30px";
+            div.style.position = "absolute";
+            div.style.top = 30*(y-map.top) + "px";
+            div.style.left = 30*(x-map.left) + "px";
+
+            var item = map[x+","+y];
+            if(item) {
+                item.createView(30*(x-map.left),30*(y-map.top),30);
+            }
+            void function(x,y){
+                div.onclick = function () {
+                    select(x,y);
+                }
+            }(x-map.left,y-map.top);
+            document.body.appendChild(div);
+        }
+    }
+}
+
+
+var tower = new Tower(10,10);
+
+
+
+new MapView({
+    top : -1,
+    left : -1,
+    bottom : 50,
+    right : 50,
+    "10,10": new Tower(10,10),
+    "10,9": new Tower(10,9),
+    "11,10": new Tower(11,10),
+    "11,9": new Tower(11,9)
+})
+*/
+</script>
+
+<script language="javascript">
+
+
+
+    void function () {
+
+        var item = [
+            { "size": 10400, "url": "0.png" }, 
+            { "size": 75100, "url": "1.png" }, 
+            { "size": 14700, "url": "2.png" }, 
+            { "size": 16200, "url": "3.png"}, 
+            { "size": 1540, "url": "ball.png"}, 
+            { "size": 5030, "url": "ball2.png"}, 
+            { "size": 62000, "url": "death.jpg"}, 
+            { "size": 21100, "url": "eggplant.png"}, 
+            { "size": 257000, "url": "hscene.png"}, 
+            { "size": 41400, "url": "nut.png"}
+        ];
+
+        var lodwidth = 630; //进度条
+        var lengths = 0; //加载完成率
+        var ptotal = 0;
+        for (var i = 0; i < item.length; i++) {
+            lengths += item[i].size;
+        }
+        var i = 0; //初始加载值
+        var j = 0; //初始化加载图片进度
+        var lod = document.getElementById("progress"); //进度条element
+        var loadingfun = function (callback) {
+
+            var number = document.getElementById("progresscontainer"); //显示进度率element
+            var items = document.getElementById("items"); //加载完的素材在这里显示element
+
+            var loadwoks = setInterval(function () {
+
+                if (j < item.length) {
+                    addChild(j, callback);
+                } else {
+                    //();
+                    clearInterval(loadwoks);
+                }
+                j++;
+            }, 1);
+
+        }
+
+        function addChild(j, callback) {
+            var itemimg = document.createElement("img");
+            itemimg.src = item[j].url;
+
+            itemimg.onload = function () {
+                ptotal += ((item[i].size / lengths) * 100);
+                console.log(1,ptotal);
+                document.getElementById("progress").style.width = ptotal + "%";
+                i++;
+                if (Math.round(ptotal) >= 100) {
+                    console.log(2,ptotal);
+                    callback();
+                }
+            }
+            itemimg.onerror = function () {
+            }
+            items.appendChild(itemimg);
+        }
+        function formatFloat(src, pos) {
+            return Math.round(src * Math.pow(10, pos)) / Math.pow(10, pos);
+        }
+
+        window.loadingfun = loadingfun;
+
+    } ();
+
+
+
+</script>
+    <script>
+function show() {
+    document.querySelector("#mask").style.opacity = 0;
+    setTimeout(function(){document.querySelector("#mask").style.display="none";  },1000)
+}
+window.onload = function () {
+    document.body.onmousedown = function (e) { e.preventDefault(); }
+    document.body.onselect = function (e) { e.preventDefault(); }
+    show();
+    document.querySelector("#newgame").onclick = function () {
+        document.querySelector("#mask").style.display = "block";
+        setTimeout(function () { document.querySelector("#mask").style.opacity = 1; }, 1);
+        setTimeout(function () {
+            document.querySelector("#mask").style.opacity = 0;
+            document.querySelector("#menu").style.display = "none";
+            document.querySelector("#loading").style.display = "block";
+
+            //document.querySelector("#game").style.display = "block";
+            loadingfun(function () {
+                document.querySelector("#mask").style.display = "block";
+                setTimeout(function () {
+                    document.querySelector("#mask").style.opacity = 1;
+                    setTimeout(function () {
+                        document.querySelector("#mask").style.opacity = 0;
+                        document.querySelector("#loading").style.display = "none";
+                        document.querySelector("#game").style.display = "block";
+                        createWorld();
+                        setTimeout(function () {
+                            document.querySelector("#mask").style.display = "none";
+                            
+                        }, 1000);
+                    }, 1000);
+                }, 1);
+            });
+            document.querySelector("#menu").style.display = "none";
+        }, 1000);
+    };
+    document.querySelector("#challange").onclick = function () {
+        document.querySelector("#mask").style.display = "block";
+        setTimeout(function () { document.querySelector("#mask").style.opacity = 1; }, 1);
+        setTimeout(function () {
+            document.querySelector("#mask").style.opacity = 0;
+            document.querySelector("#menu").style.display = "none";
+            document.querySelector("#loading").style.display = "block";
+
+            //document.querySelector("#game").style.display = "block";
+            loadingfun(function () {
+                document.querySelector("#mask").style.display = "block";
+                setTimeout(function () {
+                    document.querySelector("#mask").style.opacity = 1;
+                    setTimeout(function () {
+                        document.querySelector("#mask").style.opacity = 0;
+                        document.querySelector("#loading").style.display = "none";
+                        document.querySelector("#game").style.display = "block";
+                        createChallengeWorld();
+                        setTimeout(function () {
+                            document.querySelector("#mask").style.display = "none";
+                            
+                        }, 1000);
+                    }, 1000);
+                }, 1);
+            });
+            document.querySelector("#menu").style.display = "none";
+        }, 1000);
+    };
+    document.querySelector("#about").onclick = function () {
+        document.querySelector("#mask").style.display = "block";
+        setTimeout(function () { document.querySelector("#mask").style.opacity = 1; }, 1);
+        setTimeout(function () {
+            document.querySelector("#mask").style.opacity = 0;
+            document.querySelector("#menu").style.display = "none";
+            document.querySelector("#mask").style.display = "none";
+            document.querySelector("#aboutWindow").style.display = "block";
+            loadMarquee();
+            //document.querySelector("#game").style.display = "block";
+
+        }, 1000);
+    };
+}
+
+var data = {
+    mission0: {
+        intro:"",
+        tech:0,
+        resource:0,
+        waves:{
+            length: Infinity
+        }
+    },
+    mission1: {
+        intro:"我们的大脑仓库正在遭受攻击，这可是我们仅剩的食物了。事实已经证明了，包括橄榄球僵尸和巨人僵尸的任何僵尸在可怕的植物面前都是无力的，只有僵尸塔可以阻止它们，但是它们似乎也有准备，该死的茄子!",
+        tech:1,
+        resource:300,
+        waves:[
+            {eggplant:4},
+            {eggplant:16},
+            {eggplant:48},
+            {eggplant:96},
+        ]
+    },
+    mission2: {
+        intro:"这一次是我们的指挥部！该死他们怎么知道地址的，一定是他们强迫Zomboss博士吃了眩晕蘑菇！他们的数量太多了，使用投掷塔对付他们！啊啊啊啊，那是什么，滚动的坚果？！",
+        tech:2,
+        resource:300,
+        waves:[
+            {eggplant:4},
+            {eggplant:16},
+            {eggplant:48},
+            {eggplant:96},
+            {eggplant:96,nut:12},
+            {eggplant:128,nut:24},
+            {eggplant:128,nut:48},
+            {nut:128}
+        ]
+    }
+}
+
+function def(x) {
+    Object.defineProperty(data.mission0.waves,x.toString(),{
+        get:function(){
+            if((!(x+1).toString() in data.mission0.waves)){
+                def(x+1);
+            }
+            return {eggplant:x*4+2,nut:x*2};
+        }
+    });
+}
+for(var i=0;i<1000;i++){
+    def(i);
+}
+
+    </script>
+</head>
+<body style="padding:0 0 0 0;margin:0 0 0 0;width:100%;height:100%;">
+    <div id="mask" style="margin:0 0 0 0;position:absolute;background:black;width:100%;height:100%;z-Index:90000;opacity:1;-webkit-transition:opacity ease 1s 0s">
+    </div>
+    <div id="menu" style="padding:15px 15px 15px 15px;margin:0 0 0 0;width:100%;height:100%;text-align:center;background:url(d31.jpg) no-repeat; background-size: 100% 100%">
+        <h1><span style="color:brown;">僵尸</span>大战<span style="color:green;">植物</span></h1>
+        <ul>
+            <li id="newgame">新游戏</li>
+            <!--<li id="continuegame">继续游戏</li>-->
+            <li id="challange">挑战模式</li>
+            <li id="about">关于作品</li>
+        </ul>
+    </div>
+    <div id="loading" style="position:absolute;display:none;margin:0 0 0 0;width:100%;height:100%;text-align:center;background:black;-webkit-transition:opacity ease 1s 0s">
+        <div id="items" style="display:none;"></div>
+        <div id="progresscontainer"><div id="progress"></div></div>
+    </div>
+    <div id="game" style="position:absolute;display:none;margin:0 0 0 0;width:100%;height:100%;text-align:center;background:black;overflow:hidden;color:white;">
+    </div>
+    <div id="death" style="position:absolute;display:none;left:0;top:0;bottom:0;right:0;width:100%;height:100%;background:url(death.jpg) no-repeat;background-size:100% 100%"></div>
+
+    <div id="aboutWindow" style="position:absolute;display:none;margin:0 0 0 0;width:100%;height:100%;text-align:center;background:url(about.jpg) no-repeat #000 right top;background-size:auto 100%;overflow:hidden;color:white;">
+<script>
+    function loadMarquee() {
+        var speed = 10;
+        var demo = document.getElementById("demo");
+        var demo2 = document.getElementById("demo2");
+        var demo1 = document.getElementById("demo1");
+        demo2.innerHTML = demo1.innerHTML;
+        var MyMar = setInterval(Marquee, speed);
+        demo.onmouseover = function () { clearInterval(MyMar) }
+        demo.onmouseout = function () { MyMar = setInterval(Marquee, speed) }
+    }
+    function Marquee() {
+        if (demo2.offsetTop - demo.scrollTop <= 0)
+            demo.scrollTop -= demo1.offsetHeight
+        else {
+            demo.scrollTop++
+        }
+    }
+</script>
+    <div id="demo"align="center" style="overflow:hidden;height:500px;width:320px; border:0; margin-left:30%; ">
+        <div id="demo1" align="left"  style="white-space:pre;"> 
+<h1>僵尸大战植物</h1>
+策划：<br />
+     winter<br />
+程序:<br />
+     红莲劫焰<br />
+     红白<br />
+     snailboss<br />
+     winter<br />
+视觉设计：<br />
+     明鏡智水<br />
+特别感谢：<br />
+     HTML5梦工厂<br />
+     篱笆网<br />
+        </div>
+         <div id=demo2 align="left"  style="white-space:pre;"></div>
+    </div>
+    <a id="return" onclick="window.location.reload()">返回主菜单</a>
+    </div>
+</body>
+</html>
